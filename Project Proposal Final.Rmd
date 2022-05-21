@@ -1,0 +1,40 @@
+---
+title: "Project Proposal"
+author: "STOR 320.01 Group 17"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+# Project Roles
+
+- **Creator:** Joseph Burroughs
+- **Interpreter 1:** Yiyang Fan
+- **Interpreter 2:** Zihan Zhang
+- **Orator 1:** Rindha Sudhini
+- **Orator 2:** Wenqiong Hu
+- **Deliverer:** Julia Straight
+
+# Dataset
+**Name:** Top 1000 highest grossing movies
+
+**Hyperlink:** https://www.kaggle.com/sanjeetsinghnaik/top-1000-highest-grossing-movies?select=Highest+Holywood+Grossing+Movies.csv
+
+# Initial Questions
+
+- **Question 1:** What periods were different distributor the most popular (also look into the development of distributors)? 
+- **Question 2:** What is the relationship between the distributor and the percent of sales?
+- **Question 3:** What are the past trend in popular genres?
+- **Question 4:** How do international and domestic sales respond to different runtime?
+- **Question 5:** Is there a difference in the international and domestic preference of genres? 
+- **Question 6:** How does run time affect the popularity of movie?
+- **Question 7:** What percentage do international/domestic sales contain of the total world sales?
+- **Question 8:** Is there a correlation between movie names (length, words, etc) and sales?
+- **Question 9:** How does grouping/trends within distributors work?
+- **Question 10:** Do release dates have a seasonal affect on sales?
+- **Question 11:** Does the release year impact the run time? Is there an increase/decrease?
+- **Question 12:** Do genres tend to stick to a certain range of run-time?

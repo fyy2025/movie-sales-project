@@ -1,0 +1,415 @@
+---
+title: "Final Project"
+authors: "Yiyang Fan, Rindha Sudhini, Julia Straight, Wenqiong Hu, Zihan Zhang, Joey Burroughs"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message=FALSE, echo=FALSE}
+library(tidyverse)
+library(readr)
+library(forcats)
+library(ggplot2)
+```
+
+```{r, message=FALSE, echo=FALSE, results='hide'}
+setwd=("/Users/zzh/Desktop/UNC/2022Spring/STOR320/Final\ Project ")
+movie=read_csv("/Users/zzh/Desktop/UNC/2022Spring/STOR320/Final\ Project/movie.csv")
+Action=str_detect(movie$Genre,"Action")
+Action
+movie1=cbind(movie,Action)
+str(movie)
+names(movie)
+movie2=movie%>%
+  rename(domestic_sales=names(movie)[6],
+         international_sales=names(movie)[7],
+         total_sales=names(movie)[8],
+         date=names(movie)[5])%>%
+  separate(date,into=c("date","year"),sep=",")%>%
+  mutate(year=as.numeric(year))
+write_csv(movie2,"new_movie.csv")
+```
+
+```{r, message=FALSE, echo=FALSE, results='hide'}
+movie3=movie2%>%
+  mutate(`Movie Runtime`=str_replace(`Movie Runtime`,"hr",""),
+         `Movie Runtime`=str_replace(`Movie Runtime`,"min",""),
+         `Movie Runtime`=str_replace_all(`Movie Runtime`," ",""),
+         time=as.numeric(`Movie Runtime`),
+         minutes=ifelse(time>=100,time%/%100*60+time%%100,ifelse(time>=10,time%/%10*60+time%%10,time*60)))%>%
+  dplyr::select(-`Movie Runtime`,-time)
+setwd=("/Users/juliastraight/Desktop//stor 320/Final\ Project")
+write_csv(movie3,"New_MOVIE.csv")
+```
+
+```{r, message=FALSE, echo=FALSE, results='hide'}
+movie4=movie3%>%
+  mutate(Action=ifelse(str_detect(Genre,"Action"),1,0),
+         Adventure=ifelse(str_detect(Genre,"Adventure"),1,0),
+         `Sci-Fi`=ifelse(str_detect(Genre,"Sci-Fi"),1,0),
+         Romance=ifelse(str_detect(Genre,"Romance"),1,0),
+         Fantasy=ifelse(str_detect(Genre,"Fantasy"),1,0),
+         Animation=ifelse(str_detect(Genre,"Animation"),1,0),
+         Family=ifelse(str_detect(Genre,"Family"),1,0),
+         Comedy=ifelse(str_detect(Genre,"Comedy"),1,0),
+         Musical=ifelse(str_detect(Genre,"Musical"),1,0),
+         Crime=ifelse(str_detect(Genre,"Crime"),1,0),
+         Drama=ifelse(str_detect(Genre,"Drama"),1,0),
+         Thriller=ifelse(str_detect(Genre,"Thriller"),1,0),
+         Mystery=ifelse(str_detect(Genre,"Mystery"),1,0),
+         Biography=ifelse(str_detect(Genre,"Biography"),1,0),
+         Sport=ifelse(str_detect(Genre,"Sport"),1,0),
+         Horror=ifelse(str_detect(Genre,"Horror"),1,0),
+         total=Action+Adventure+`Sci-Fi`+Romance+Fantasy+Animation+Family+Comedy+Musical+Crime+Drama+Thriller+Mystery+Biography+Sport+Horror)%>%
+  separate(Title,into=c("title","year in parenthesis"),sep=-6)
+write_csv(movie4,"FINAL_MOVIE.csv")
+```
+
+
+
+**Question 5:** Is there a difference in the international and domestic preference of genres?
+```{r, message=FALSE, echo=FALSE}
+ratio=rep(0,16)
+for (i in c(14:29)){
+  part=filter(movie4,movie4[i]==1)
+  ratio[i-13]=mean(part[["domestic_sales"]]/part[["total_sales"]])
+}
+names(ratio)=names(movie4)[14:29]
+data.frame(as.list(ratio))%>%
+  gather(Action:Horror,key=genre,value=rate)%>%
+  ggplot()+ ggtitle("Domestic Proportion of Total Sales by Genre") + xlab("Proportion of Total Sales") + ylab("Genre") + 
+  geom_bar(stat="identity",aes(y=fct_reorder(genre,ratio),x=rate))
+```
+
+Generating confidence intervals
+
+```{r}
+movie5=movie4%>%
+  mutate(prop=domestic_sales/total_sales)
+MEAN_PROP=mean(movie5$prop,na.rm=T)
+mean=rep(0,16)
+se=rep(0,16)
+for (i in c(14:29)){
+  part=filter(movie5,movie5[i]==1)
+  mean[i-13]=mean(part$prop,na.rm=T)
+  se[i-13]=sd(part$prop,na.rm=T)/sqrt(length(part$prop))
+}
+left_bound=mean-2*se
+right_bound=mean+2*se
+as.data.frame(cbind(names(movie4)[14:29],mean,se,left_bound,right_bound))%>%
+  rename("genre"=`V1`)%>%
+  mutate(mean=as.numeric(mean),
+         left_bound=as.numeric(left_bound),
+         right_bound=as.numeric(right_bound),
+         spread=ifelse(left_bound>MEAN_PROP,1,ifelse(right_bound<MEAN_PROP,-1,0)))%>%
+  ggplot()+
+  geom_errorbar(aes(y=genre,xmin=left_bound,xmax=right_bound,col=as.factor(spread)))+
+  geom_vline(xintercept=MEAN_PROP,linetype = "longdash",col="red")+
+  geom_point(aes(x=mean,y=genre),fill="white",size=4,shape=21)+
+  xlab("domestic sales / total sales")
+```
+
+As action is significantly below average, what kind of combination will make action less popular domestically compared with internationally?
+```{r}
+genre_covariance=matrix(NA,16,16)
+colnames(genre_covariance)=names(movie4)[14:29]
+rownames(genre_covariance)=names(movie4)[14:29]
+for (i in c(14:29)){
+  genre_specific=filter(movie5,movie5[i]==1)
+  mean=rep(0,16)
+  se=rep(0,16)
+  for (j in c(14:29)){
+    part=filter(genre_specific,genre_specific[j]==1)
+    mean[j-13]=mean(part$prop,na.rm=T)
+    se[j-13]=sd(part$prop,na.rm=T)/sqrt(length(part$prop))
+  }
+  left_bound=mean-2*se
+  right_bound=mean+2*se
+  data=as.data.frame(cbind(names(movie4)[14:29],mean,se,left_bound,right_bound))%>%
+      rename("genre"=`V1`)%>%
+      mutate(mean=as.numeric(mean),
+            left_bound=as.numeric(left_bound),
+            right_bound=as.numeric(right_bound),
+            spread=ifelse(left_bound>MEAN_PROP,1,ifelse(right_bound<MEAN_PROP,-1,0)))
+  for (k in c(1:16)){
+    genre_covariance[i-13,k]=data$spread[k]
+  }
+}
+genre_covariance
+```
+```{r}
+as.data.frame(genre_covariance)%>%
+  mutate(genre=row.names(.))%>%
+  gather(Action:Horror,key="genre2",value="spread")%>%
+  ggplot()+
+  geom_tile(aes(x=genre2,y=genre,fill=factor(spread)),col="black")+
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_fill_manual(values = c("deepskyblue","lightblue","blue"))+
+  geom_abline(a=0,b=1)
+```
+
+Webscrap the rating
+```{r}
+library(rvest)    
+rating=read_csv("https://raw.githubusercontent.com/dineshsonachalam/IMDB_5000_Movies_Statistics_Report-/master/movie_metadata.csv")%>%
+  separate(movie_title,into=c("title","no"),sep=-1)%>%
+  dplyr::select(title,budget,imdb_score)
+
+movie6= read_csv("/Users/zzh/Desktop/UNC/2022Spring/STOR320/Final\ Project/FINAL_MOVIE.csv")
+```
+
+Generating predictive models about the domestic sales
+```{r}
+library(purrr)
+library(modelr)
+movie7=movie6%>%
+  mutate(name_length=nchar(title))%>%
+  filter(!is.na(date))%>%
+  separate(date,into=c("month","day"),sep=" ")%>% #only 800 observations 
+  mutate(month=factor(month,unique(month)),
+         month=fct_collapse(month,
+        Winter=c("December", "January","February"),
+        Spring=c("March", "April","May"),
+        Summer=c("June", "July","August"),
+        Autumn=c("September", "October","November")),
+        log_domestic=log(domestic_sales)
+        )%>%
+  dplyr::select(Action:Horror,month,year,minutes,budget,imdb_score,log_domestic)
+```
+
+First model: linear
+```{r}
+data=crossv_kfold(na.omit(movie7),k=10)
+model.func=function(data){
+  mod=lm(log_domestic~Action:Horror+month+year+minutes+budget+imdb_score,data=data) # log of domestic
+  return(mod)
+}
+data2=data%>%
+  mutate(model=map(train,model.func))
+```
+
+```{r}
+library(broom)
+data2.predict=data2%>%
+  mutate(predict=map2(.x=test,.y=model,~augment(.y,newdata=.x)))%>%
+  dplyr::select(predict)%>%
+  unnest()
+RMSE.func=function(actual,predict){
+  SSE=sum((actual-predict)^2)
+  return(sqrt(SSE/length(actual)))
+}
+INITIAL_RMSE=RMSE.func(data2.predict$log_domestic,data2.predict$.fitted)
+INITIAL_RMSE
+```
+
+```{r}
+ggplot(data=data2.predict)+
+  geom_point(aes(x=.fitted,y=log_domestic))+
+  geom_abline(col="red")
+```
+
+Second Model: manually choose variables
+```{r}
+lm.fit=lm(log_domestic~.,movie7)
+coeff=tidy(lm.fit)%>%
+  filter(p.value<0.05)%>%
+  dplyr::select(term,estimate)
+m=model.matrix(log_domestic~.,na.omit(movie7))
+model=na.omit(movie7)%>%
+  mutate(predict=m[,coeff[[1]]]%*%coeff[[2]])
+EIGHT_VARIABLE_RMSE=RMSE.func(model$log_domestic,model$predict)
+model%>%
+  ggplot()+
+  geom_point(aes(x=predict,y=log_domestic))+
+  geom_abline(col="red")
+EIGHT_VARIABLE_RMSE
+```
+
+
+Third Model: best subset
+```{r}
+library(leaps)
+regfit.full=regsubsets(log_domestic~.,data=movie7,nvmax=22)
+summary1=summary(regfit.full)
+par(mfrow=c(2,2))
+plot(summary1$rss,xlab="Number of Variables",ylab="RSS",type="l") #type="l" connects the plotted points with lines
+plot(summary1$adjr2,xlab="Number of variables",ylab="Adjusted R^2",type="l")
+# I believe 14 variable-model is good enough
+best_subset_coef=coef(regfit.full,14)
+m=model.matrix(log_domestic~.,na.omit(movie7))
+model2=na.omit(movie7)%>%
+  mutate(predict=m[,names(coef)]%*%coef)
+model2%>%
+  ggplot()+
+  geom_point(aes(x=predict,y=log_domestic))+
+  geom_abline(col="red")
+best_subset_RMSE=RMSE.func(model2$log_domestic,model2$predict)
+best_subset_RMSE
+```
+
+Fourth Model: Best subset with cross validation
+```{r}
+predict.regsubsets=function(object,newdata,id,...){
+  form=as.formula(object$call[[2]])
+  mat=model.matrix(form,newdata)
+  coefi=coef(object,id=id)
+  yvars=mat[,names(coefi)]
+  return(yvars%*%coefi)
+}
+set.seed(2)
+fold=sample(1:10,nrow(na.omit(movie7)),rep=T)
+cv.sse=matrix(NA,10,22,dimnames=list(NULL,paste(1:22)))
+for (i in 1:10){
+  regfit=regsubsets(log_domestic~.,na.omit(movie7),nvmax=22,subset=(fold!=i))
+  for (j in 1:22){
+    predict=predict.regsubsets(regfit,na.omit(movie7)[fold==i,],id=j)
+    cv.sse[i,j]=mean((na.omit(movie7)$log_domestic[fold==i]-predict)^2)
+  }
+}
+mean.cv.sse=apply(cv.sse,2,mean,drop=T)
+mean.cv.sse
+plot(mean.cv.sse)
+CV.SUBSET.RMSE=sqrt(mean.cv.sse[3])
+CV.SUBSET.RMSE
+```
+
+Fifth Model: Lasso
+```{r}
+library(glmnet)
+x=model.matrix(log_domestic~.,na.omit(movie7))[,-1]
+y=na.omit(movie7)$log_domestic
+lambda_grid=10^seq(10,-2,length=100)
+cv.out=cv.glmnet(x,y,alpha=1)
+plot(cv.out)
+bestLambda=cv.out$lambda.1se
+i= which(cv.out$lambda == bestLambda)
+bestLambda
+best.lasso.fit=glmnet(x,y,alpha=1,lambda=bestLambda)
+movie7.predict=na.omit(movie7)%>%
+  mutate(predict=predict(best.lasso.fit,newx=x))
+movie7.predict%>%
+  ggplot()+
+  geom_point(aes(x=predict,y=log_domestic))+
+  geom_abline(col="red")
+lasso_coef=coef(best.lasso.fit)
+lasso_coef=lasso_coef[lasso_coef[,1]!=0,]
+LASSO_RMSE=RMSE.func(movie7.predict$predict,movie7.predict$log_domestic)
+```
+
+Sixth model: Lasso with interaction
+```{r}
+set.seed(20)
+library(glmnet)
+x=model.matrix(log_domestic~.*.,na.omit(movie7))[,-1]
+y=na.omit(movie7)$log_domestic
+lambda_grid=10^seq(10,-2,length=100)
+cv.out=cv.glmnet(x,y,alpha=1)
+plot(cv.out)
+bestLambda=cv.out$lambda.1se
+best.lasso.interaction.fit=glmnet(x,y,alpha=1,lambda=bestLambda)
+movie7.predict=na.omit(movie7)%>%
+  mutate(predict=predict(best.lasso.interaction.fit,newx=x))
+movie7.predict%>%
+  ggplot()+
+  geom_point(aes(x=predict,y=log_domestic))+
+  geom_abline(col="red")
+lasso_coef=coef(best.lasso.interaction.fit)
+lasso_interaction_coef=lasso_coef[lasso_coef[,1]!=0,]
+lasso_interaction_coef
+LASSO_INTERACTION_RMSE=RMSE.func(movie7.predict$predict,movie7.predict$log_domestic)
+```
+
+compare models
+```{r}
+domestic_models=tribble(
+  ~model, ~RMSE,  ~variables,
+  "lm", INITIAL_RMSE,  23,
+  "lm2", EIGHT_VARIABLE_RMSE,  8,
+  "Best Subset", best_subset_RMSE, 14,
+  "CV Best Subset", CV.SUBSET.RMSE, 3,
+  "Lasso", LASSO_RMSE , 4,
+  "Lasso with interaction", LASSO_INTERACTION_RMSE, 11
+  )
+domestic_models
+```
+
+Change dataset to predict international sale
+```{r}
+movie8=movie6%>%
+  mutate(name_length=nchar(title))%>%
+  filter(!is.na(date))%>%
+  separate(date,into=c("month","day"),sep=" ")%>% #only 800 observations 
+  mutate(month=factor(month,unique(month)),
+         month=fct_collapse(month,
+        Winter=c("December", "January","February"),
+        Spring=c("March", "April","May"),
+        Summer=c("June", "July","August"),
+        Autumn=c("September", "October","November")),
+        log_international=log(international_sales))%>%
+  dplyr::select(Action:Horror,month,year,minutes,budget,imdb_score,log_international)
+```
+
+Best Subset for international
+```{r}
+library(leaps)
+regfit.full=regsubsets(log_international~.,data=movie8,nvmax=22)
+summary1=summary(regfit.full)
+par(mfrow=c(2,2))
+plot(summary1$rss,xlab="Number of Variables",ylab="RSS",type="l") #type="l" connects the plotted points with lines
+plot(summary1$adjr2,xlab="Number of variables",ylab="Adjusted R^2",type="l")
+# I believe 14 variable-model is good enough
+best_subset_coef2=coef(regfit.full,20)
+m=model.matrix(log_international~.,na.omit(movie8))
+model2=na.omit(movie8)%>%
+  mutate(predict=m[,names(coef)]%*%coef)
+model2%>%
+  ggplot()+
+  geom_point(aes(x=predict,y=log_international))+
+  geom_abline(col="red")
+best_subset_RMSE=RMSE.func(model2$log_international,model2$predict)
+best_subset_RMSE
+```
+
+Lasso with interaction for international
+```{r}
+x=model.matrix(log_international~.*.,na.omit(movie8))[,-1]
+y=na.omit(movie8)$log_international
+lambda_grid=10^seq(10,-2,length=100)
+cv.out2=cv.glmnet(x,y,alpha=1)
+plot(cv.out2)
+bestLambda=cv.out2$lambda.1se
+i=which(cv.out2$lambda==bestLambda)
+best.lasso.interaction.fit2=glmnet(x,y,alpha=1,lambda=bestLambda)
+movie8.predict=na.omit(movie8)%>%
+  mutate(predict=predict(best.lasso.interaction.fit2,newx=x))
+movie8.predict%>%
+  ggplot()+
+  geom_point(aes(x=predict,y=log_international))+
+  geom_abline(col="red")
+lasso_coef2=coef(best.lasso.interaction.fit2)
+lasso_interaction_coef2=lasso_coef2[lasso_coef2[,1]!=0,]
+lasso_interaction_coef2
+LASSO_INTERACTION_RMSE2=RMSE.func(movie8.predict$predict,movie8.predict$log_international)
+```
+```{r}
+best_subset_coef
+best_subset_coef2
+```
+
+```{r}
+movie6%>%
+  ggplot()+
+  geom_boxplot(aes(x=cut_width(imdb_score,1),y=domestic_sales))
+movie6%>%
+  ggplot()+
+  geom_boxplot(aes(x=cut_width(imdb_score,1),y=international_sales))
+```
+
+**Reflection Paragraphs:**
+In our initial questions, there were two types of questions we were exploring: relationships between different groups in a variable and where we wanted to see if a relationship existed at all. Questions that fell in the first category included comparing the popularity of different distributors over time, how international and domestic sales were split, and audience preference of genres. These questions allowed us to see differences within a variable (distributors, genre) and compare the responses of these subgroups to each other. Interestingly enough, the second category of our questions revealed that moderate to strong relationships existed between more variables than originally thought. This included positive correlations between the characters in a movie name and run-time with the number of sales, which we did not expect. 
+
+While answering the initial questions and their resulting graphs, we created follow-up questions that dived deeper. An example of this is our first follow-up question which asked about covariance between different distributors. We wanted to know if the popularity of distributors depended on other distributors at the time, and from our graph, there was an indication that covariance did exist as the increase in sales for one distributor was often followed by the decrease in sales of other distributors. Another one of our follow-up questions aimed to understand how genre preference varied between international and domestic audiences. The data revealed that each audience did have a preference towards a specific genre, and it also showed us the benefit of asking questions that explored specific details, rather than just establishing a correlation. 
+
